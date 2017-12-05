@@ -119,6 +119,9 @@ def pad_audio(data, fs, T):
     shape = data.shape
     # Create the target shape    
     N_pad = N_tar - shape[0]
+    if N_pad < 0:
+    	data = np.asarray(data, dtype = np.int16)
+        return data
     print("Padding with %s seconds of silence" % str(float(N_pad)/fs) )
     shape = (N_pad,) + shape[1:]
     # Stack only if there is something to append    
@@ -231,6 +234,9 @@ def feature_extraction (subdir, file):
 
 
 
+#TODO:
+#NORMALIZE ALL FEATURES, NOT JUST RAW SPECTROGRAM
+#SPLIT DATASET IN A TRAIN/TEST IN A WAY THAT ONE SPEAKER DOESNT OCCUR IN BOTH TRAIN AND TEST SETS
 
 #feature_extraction("../input/train/audio/seven/", "b9f46737_nohash_1.wav")
 
