@@ -219,12 +219,15 @@ def feature_extraction (subdir, file):
 	#5 - Feature 2: Mel Power Spectrogram
 	mel_power_specgram = get_mel_power_specgram(resampled_vad_padded, new_sample_rate)
 
+	norm_mel_power_specgram = normalize_specgram(mel_power_specgram)
+
 	#6 - Feature 3: MFCC
 	mfcc = get_mfcc(mel_power_specgram)
+	norm_mfcc = normalize_specgram(mfcc)
 	
-	print_mel_power(mel_power_specgram, new_sample_rate, final_directory_melpower, file)
+	print_mel_power(norm_mel_power_specgram, new_sample_rate, final_directory_melpower, file)
 	
-	print_mfcc (mfcc, final_directory_mfcc, file)
+	print_mfcc (norm_mfcc, final_directory_mfcc, file)
 
 	if not os.path.exists(os.path.dirname(final_directory_audio)):
 		print (final_directory_audio)
