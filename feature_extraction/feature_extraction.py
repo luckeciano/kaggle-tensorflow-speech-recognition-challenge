@@ -23,6 +23,15 @@ import librosa.display
 import webrtcvad
 import struct
 
+import argparse
+
+# Parsing arguments for Network definition
+ap = argparse.ArgumentParser()
+ap.add_argument('-DEBUG', type=bool, default=False)
+args = vars(ap.parse_args())
+
+DEBUG = args['DEBUG']
+
 RESAMPLED_TRAIN_PATH = '../input/resampled/'
 TRAIN_PATH = '../input/train/'
 SPECGRAM_PATH = '../input/spectrogram/'
@@ -62,10 +71,12 @@ def print_specgram(freqs, times, spectrogram, samples, sample_rate, filename, fi
 	ax2.set_title('Spectrogram of ' + filename)
 	ax2.set_ylabel('Freqs in Hz')
 	ax2.set_xlabel('Seconds')
-	if not os.path.exists(os.path.dirname(filepath)):
-		print (filepath)
-		os.makedirs(os.path.dirname(filepath))
-	fig.savefig(filepath + filename + ".png")
+	if DEBUG:
+		if not os.path.exists(os.path.dirname(filepath)):
+			print (filepath)
+			os.makedirs(os.path.dirname(filepath))
+		fig.savefig(filepath + filename + ".png")
+	np.savetxt(filepath + filename[:-4], spectrogram)
 	plt.close()
 
 
@@ -119,9 +130,10 @@ def pad_audio(data, fs, T):
     shape = data.shape
     # Create the target shape    
     N_pad = N_tar - shape[0]
+    seconds_of_pad = float(N_pad)/fs
     if N_pad < 0:
     	data = np.asarray(data, dtype = np.int16)
-        return data
+        return data, seconds_of_pad
     print("Padding with %s seconds of silence" % str(float(N_pad)/fs) )
     shape = (N_pad,) + shape[1:]
     # Stack only if there is something to append    
@@ -129,15 +141,15 @@ def pad_audio(data, fs, T):
         if len(shape) > 1:
             speech_data = np.vstack((data, np.zeros(shape)))
             speech_data = np.asarray(speech_data, dtype = np.int16)
-            return speech_data
+            return speech_data, seconds_of_pad
         else:
             speech_data = np.hstack((data, np.zeros(shape)))
             speech_data = np.asarray(speech_data, dtype = np.int16)
-            return speech_data
+            return speech_data, seconds_of_pad
                             
     else:
     	data = np.asarray(data, dtype = np.int16)
-        return data
+        return data, seconds_of_pad
 
 def normalize_specgram(spectrogram):
 	mean = np.mean(spectrogram, axis=0)
@@ -160,10 +172,12 @@ def print_mel_power(log_S, sample_rate, filepath, filename):
 	plt.title('Mel power spectrogram ')
 	plt.colorbar(format='%+02.0f dB')
 	plt.tight_layout()
-	if not os.path.exists(os.path.dirname(filepath)):
-		print (filepath)
-		os.makedirs(os.path.dirname(filepath))
-	fig.savefig(filepath + filename + ".png")
+	if DEBUG:
+		if not os.path.exists(os.path.dirname(filepath)):
+			print (filepath)
+			os.makedirs(os.path.dirname(filepath))
+		fig.savefig(filepath + filename + ".png")
+	np.savetxt(filepath + filename[:-4], log_S)
 	plt.close()
 
 def get_mfcc(log_S):
@@ -181,10 +195,12 @@ def print_mfcc(delta2_mfcc, filepath, filename):
 	plt.title('MFCC')
 	plt.colorbar()
 	plt.tight_layout()
-	if not os.path.exists(os.path.dirname(filepath)):
-		print (filepath)
-		os.makedirs(os.path.dirname(filepath))
-	fig.savefig(filepath + filename + ".png")
+	if DEBUG:
+		if not os.path.exists(os.path.dirname(filepath)):
+			print (filepath)
+			os.makedirs(os.path.dirname(filepath))
+		fig.savefig(filepath + filename + ".png")
+	np.savetxt(filepath + filename[:-4], delta2_mfcc)
 	plt.close()
 
 def feature_extraction (subdir, file):
@@ -199,14 +215,17 @@ def feature_extraction (subdir, file):
 	
 	#OBS: Este primeiro padding deixa todos os audios com 1 segundo de duracao. Se nao fizer esse padding,
 	#haverao audios que o VAD nao conseguira processar
-	resampled = pad_audio(resampled, new_sample_rate, 1.0)
+	resampled,_ = pad_audio(resampled, new_sample_rate, 1.0)
 	
 	#2 - Voice Activity Detection
 	resampled_vad = voice_activity_detection(resampled, new_sample_rate)
 
 	#3 - Padding with zeroes
-	resampled_vad_padded = pad_audio(resampled_vad, new_sample_rate, 1.0)
+	resampled_vad_padded, seconds_of_pad = pad_audio(resampled_vad, new_sample_rate, 1.0)
 
+	if seconds_of_pad >= 0.99:
+		print ("No voice detected. Skipping audio...")
+		return
 	#4 - Feature 1: Spectrogram
 	freqs, times, spectrogram = get_specgram(resampled_vad_padded, new_sample_rate)
 
