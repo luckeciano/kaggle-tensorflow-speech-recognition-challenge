@@ -33,7 +33,8 @@ args = vars(ap.parse_args())
 DEBUG = args['DEBUG']
 
 RESAMPLED_TRAIN_PATH = '../input/resampled/'
-TRAIN_PATH = '../input/train/'
+TRAIN_PATH = '../input/split_train/'
+VAL_PATH = '../input/split_validation/'
 SPECGRAM_PATH = '../input/spectrogram/'
 MELPOWER_PATH = '../input/mel_power/'
 MFCC_PATH = '../input/mfcc/'
@@ -56,28 +57,30 @@ def get_specgram(samples, sample_rate):
 	return freqs, times, spectrogram
 
 def print_specgram(freqs, times, spectrogram, samples, sample_rate, filename, filepath):
-
-	fig = plt.figure(figsize=(14, 8))
-	ax1 = fig.add_subplot(211)
-	ax1.set_title('Raw wave of ' + filename)
-	ax1.set_ylabel('Amplitude')
-	ax1.plot(np.linspace(0, sample_rate/len(samples), sample_rate), samples)
-	
-	ax2 = fig.add_subplot(212)
-	ax2.imshow(spectrogram.T, aspect='auto', origin='lower', 
-	           extent=[times.min(), times.max(), freqs.min(), freqs.max()])
-	ax2.set_yticks(freqs[::16])
-	ax2.set_xticks(times[::16])
-	ax2.set_title('Spectrogram of ' + filename)
-	ax2.set_ylabel('Freqs in Hz')
-	ax2.set_xlabel('Seconds')
-	if DEBUG:
-		if not os.path.exists(os.path.dirname(filepath)):
+	if not os.path.exists(os.path.dirname(filepath)):
 			print (filepath)
 			os.makedirs(os.path.dirname(filepath))
+
+	if DEBUG:	
+		fig = plt.figure(figsize=(14, 8))
+		ax1 = fig.add_subplot(211)
+		ax1.set_title('Raw wave of ' + filename)
+		ax1.set_ylabel('Amplitude')
+		ax1.plot(np.linspace(0, sample_rate/len(samples), sample_rate), samples)
+		
+		ax2 = fig.add_subplot(212)
+		ax2.imshow(spectrogram.T, aspect='auto', origin='lower', 
+		           extent=[times.min(), times.max(), freqs.min(), freqs.max()])
+		ax2.set_yticks(freqs[::16])
+		ax2.set_xticks(times[::16])
+		ax2.set_title('Spectrogram of ' + filename)
+		ax2.set_ylabel('Freqs in Hz')
+		ax2.set_xlabel('Seconds')	
 		fig.savefig(filepath + filename + ".png")
+		plt.close()
+
 	np.savetxt(filepath + filename[:-4], spectrogram)
-	plt.close()
+	
 
 
 def resample(filename):
@@ -167,18 +170,20 @@ def get_mel_power_specgram(samples, sample_rate):
 	return log_S
 
 def print_mel_power(log_S, sample_rate, filepath, filename):
-	fig = plt.figure(figsize=(12, 4))
-	librosa.display.specshow(log_S, sr=sample_rate, x_axis='time', y_axis='mel')
-	plt.title('Mel power spectrogram ')
-	plt.colorbar(format='%+02.0f dB')
-	plt.tight_layout()
-	if DEBUG:
-		if not os.path.exists(os.path.dirname(filepath)):
+	if not os.path.exists(os.path.dirname(filepath)):
 			print (filepath)
 			os.makedirs(os.path.dirname(filepath))
-		fig.savefig(filepath + filename + ".png")
+	if DEBUG:
+		fig = plt.figure(figsize=(12, 4))
+		librosa.display.specshow(log_S, sr=sample_rate, x_axis='time', y_axis='mel')
+		plt.title('Mel power spectrogram ')
+		plt.colorbar(format='%+02.0f dB')
+		plt.tight_layout()
+		fig.savefig(filepath + filename + ".png")		
+		plt.close()		
+		
 	np.savetxt(filepath + filename[:-4], log_S)
-	plt.close()
+	
 
 def get_mfcc(log_S):
 	mfcc = librosa.feature.mfcc(S=log_S, n_mfcc=13)
@@ -188,27 +193,31 @@ def get_mfcc(log_S):
 	return delta2_mfcc
 
 def print_mfcc(delta2_mfcc, filepath, filename):
-	fig = plt.figure(figsize=(12, 4))
-	librosa.display.specshow(delta2_mfcc)
-	plt.ylabel('MFCC coeffs')
-	plt.xlabel('Time')
-	plt.title('MFCC')
-	plt.colorbar()
-	plt.tight_layout()
-	if DEBUG:
-		if not os.path.exists(os.path.dirname(filepath)):
+	if not os.path.exists(os.path.dirname(filepath)):
 			print (filepath)
 			os.makedirs(os.path.dirname(filepath))
+	if DEBUG:
+		fig = plt.figure(figsize=(12, 4))
+		librosa.display.specshow(delta2_mfcc)
+		plt.ylabel('MFCC coeffs')
+		plt.xlabel('Time')
+		plt.title('MFCC')
+		plt.colorbar()
+		plt.tight_layout()
 		fig.savefig(filepath + filename + ".png")
+		plt.close()	
+		
 	np.savetxt(filepath + filename[:-4], delta2_mfcc)
-	plt.close()
+	
 
-def feature_extraction (subdir, file):
+def feature_extraction (subdir, file, split):
 	filename = os.path.join(subdir, file)
-	final_directory_audio = RESAMPLED_TRAIN_PATH + os.path.basename(subdir) + "/"
-	final_directory_specgram = SPECGRAM_PATH + os.path.basename(subdir)  + "/"
-	final_directory_melpower = MELPOWER_PATH + os.path.basename(subdir)  + "/"
-	final_directory_mfcc = MFCC_PATH + os.path.basename(subdir)  + "/"
+	final_directory_audio = RESAMPLED_TRAIN_PATH  + split + '/' + os.path.basename(subdir) + '/'
+	final_directory_specgram = SPECGRAM_PATH  + split + '/' + os.path.basename(subdir)  + '/'
+	final_directory_melpower = MELPOWER_PATH  + split + '/' + os.path.basename(subdir)  + "/" 
+	final_directory_mfcc = MFCC_PATH + split + '/'+ os.path.basename(subdir)  + "/" 
+
+	
 	
 	#1 - Resample: Dimensionality Reduction
 	resampled, new_sample_rate = resample(filename)	
@@ -267,7 +276,13 @@ for subdir, dirs, files in os.walk(TRAIN_PATH):
 	for file in files:
 		if file.endswith(".wav"):
 			print (file)
-			feature_extraction(subdir, file)
+			feature_extraction(subdir, file, "split_train")
+
+for subdir, dirs, files in os.walk(VAL_PATH):
+	for file in files:
+		if file.endswith(".wav"):
+			print (file)
+			feature_extraction(subdir, file, "split_validation")
 			
 
 
